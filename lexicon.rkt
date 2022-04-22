@@ -6,7 +6,7 @@
     [(libdata-lexicon) entries]
     [(libsplit-text*) (λ (x _) (list x))]))
 (define (make-attachment payload _name _mime) payload)
-(define string-args "tater")
+(define string-args "rod of the depths")
 
 (define lexicon-base "https://botaniamod.net/lexicon.php#")
 (define custom-inputs
@@ -15,37 +15,37 @@
 
 (define (num-matches title args)
   (define args*
-    (or
-     (and~>>
-      custom-inputs
-      (assf (curry string-contains? (string-foldcase args)))
-      cdr
-      string-foldcase)
-     (string-foldcase args)))
+    (or (and~>> custom-inputs
+                (assf (curry string-contains? (string-foldcase args)))
+                cdr
+                string-foldcase)
+        (string-foldcase args)))
   (define title* (string-foldcase title))
   (define (smart-string-prefix? str1 str2)
     (define lst (list str1 str2))
     (>= (~>> lst (map string->list) (apply take-common-prefix) length)
         (~>> lst (map string-length) (apply min) (max 3))))
-  (count
-   (curry apply smart-string-prefix?)
-   (cartesian-product (string-split title*) (string-split args*))))
+  (for*/sum ([title-str (string-split title*)]
+             [arg-str (string-split args*)]
+             #:when (smart-string-prefix? title-str arg-str))
+    (~>> (list title-str arg-str)
+         (map string->list)
+         (apply take-common-prefix)
+         length)))
 
-(~>>
- (call-trick 'libdata-lexicon #f)
- (map
-  (λ (entry)
-    (cons
-     (num-matches (car entry) string-args)
-     (cdr entry))))
- (argmax car)
- (match _
-   [(cons 0 _) "No matches were found!"]
-   [(list _ bookmark text)
-    (values
-     (~a lexicon-base bookmark)
-     (make-attachment
-      (string->bytes/utf-8
-       (string-join ((call-trick 'libsplit-text* #f) text 20) "\n"))
-      "matched.txt"
-      ".txt"))]))
+(~>> (call-trick 'libdata-lexicon #f)
+     (map (λ (entry)
+            (cons
+             (num-matches (car entry) string-args)
+             (cdr entry))))
+     (argmax car)
+     (match _
+         [(cons 0 _) "No matches were found!"]
+         [(list _ bookmark text)
+          (values
+           (~a lexicon-base bookmark)
+           (make-attachment
+            (string->bytes/utf-8
+             (string-join ((call-trick 'libsplit-text* #f) text 80) "\n"))
+            "matched.txt"
+            ".txt"))]))
